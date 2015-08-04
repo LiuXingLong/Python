@@ -1,0 +1,180 @@
+import http.cookiejar
+import urllib.request
+import urllib.error
+import urllib.parse
+import json
+import random
+
+#检测网页打开是否错误
+def get_exception(req):    
+    try:
+        response=urllib.request.urlopen(req)
+    except urllib.error.URLError as e:
+        if hasattr(e,'reason'):
+            print('We failed to reach a server.')
+            print('Reason:',e.reason)
+        elif hasattr(e,'code'):
+            print('The server couldn\'t fulfill the request.')
+            print('Error code:',e.code)
+    else:
+         return response
+
+#设置header模拟浏览器访问
+def set_header(flag,url1,url2,data=None):
+    if flag=='1':
+        req = urllib.request.Request(url1,data)
+        req.add_header('Referer','http://kdjw.hnust.cn/kdjw/')
+    else:
+        req = urllib.request.Request(url2,data)
+        req.add_header('Referer','http://xxjw.hnust.cn/xxjw/')
+    req.add_header('User-Agent','Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36')
+    return req;
+
+#查找并插入数据到列表
+def find_set(html,grade):
+    a=html.find('title="null" >')
+    while a!=-1:
+        b=html.find('</td>',a)
+        if b!=-1:
+            grade.append(html[a+14:b])
+        else:
+            b=a
+        a=html.find('title="null" >',b)
+    return grade;
+
+#将列表排序
+def get_sort(grade):
+    grade1=[]
+    l=len(grade)
+    l=l/10-1
+    i=0
+    while i<l:
+        j=0
+        while j<l-i:
+            if grade[j*10+2]>grade[(j+1)*10+2]:
+                grade1[0:9]=grade[((j+1)*10):((j+1)*10+9)]
+                grade[((j+1)*10):((j+1)*10+9)]=grade[(j*10):(j*10+9)]
+                grade[(j*10):(j*10+9)]=grade1[0:9]
+            j+=1
+        i+=1
+
+def main(flag):
+    #使用代理
+    iplist =['202.106.16.36:3128','107.182.17.149:7808']
+    proxy_support = urllib.request.ProxyHandler({'http':random.choice(iplist)})
+    opener = urllib.request.build_opener(proxy_support)
+    opener.addheaders = [('Referer','http://kdjw.hnust.cn/kdjw/'),('User-Agent','Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36')]
+
+    #获取cookie信息
+    cj = http.cookiejar.CookieJar()
+    pro = urllib.request.HTTPCookieProcessor(cj)
+    opener = urllib.request.build_opener(pro,urllib.request.HTTPHandler)
+    urllib.request.install_opener(opener)
+
+    #获取验证码
+    image1='http://kdjw.hnust.cn/kdjw/verifycode.servlet'
+    image2='http://xxjw.hnust.cn/xxjw/verifycode.servlet'
+    req=set_header(flag,image1,image2)
+    response = get_exception(req)
+                   
+    '''
+    for item in cj:
+        print("Cookie: Name"+item.name)
+        print("Cookie: value"+item.value)
+    '''
+
+    #保存验证码
+    imagedata = response.read()
+    fp = open('验证码.jpg','wb')
+    fp.write(imagedata)
+    fp.close()
+
+    #Post请求数据
+    url1='http://kdjw.hnust.cn/kdjw/Logon.do?method=logon'
+    url2='http://xxjw.hnust.cn/xxjw/Logon.do?method=logon'
+    usename = input("学号:")
+    usepass = input("密码:")
+    yanzhengma = input("验证码:")
+    data={}
+    data['USERNAME']=usename
+    data['PASSWORD']=usepass
+    data['RANDOMCODE']=yanzhengma
+    data = urllib.parse.urlencode(data).encode('utf-8')
+    req=set_header(flag,url1,url2,data)
+    response = get_exception(req)
+    html=response.read().decode('utf-8')
+
+    #登入信息测试模块
+    a=html.find('验证码错误!')
+    if a!=-1:
+        print('验证码错误!')
+        return;
+    a=html.find('该帐号不存在或密码错误,请联系管理员!')
+    if a!=-1:
+        print('该帐号不存在或密码错误,请联系管理员!')
+        return;
+    
+    gradeurl1 = 'http://kdjw.hnust.cn/kdjw/xszqcjglAction.do?method=queryxscj'
+    gradeurl2 = 'http://xxjw.hnust.cn/xxjw/xszqcjglAction.do?method=queryxscj'
+    gradepostdata = {
+        'kksj':'',
+        'kcxz':'',
+        'xsfs':'qbcj',
+        'ok':''
+        }
+    gradepostdata = urllib.parse.urlencode(gradepostdata).encode('utf-8')
+    req=set_header(flag,gradeurl1,gradeurl2,gradepostdata)
+    response = get_exception(req)
+    html = response.read().decode('utf-8')
+
+    #将成绩保存到列表
+    grade=[]
+    find_set(html,grade)
+
+    #获取总页数
+    a=html.find('totalPages')
+    a=html[a+19]
+    
+    #进行下一页查找
+    i=2
+    while i<=int(a):
+        xiadata={}
+        xiadata['PageNum']=i
+        xiadata = urllib.parse.urlencode(xiadata).encode('utf-8')
+        req=set_header(flag,gradeurl1,gradeurl2,xiadata)
+        response = get_exception(req)
+        html = response.read().decode('utf-8')
+        find_set(html,grade)
+        i+=1
+        
+    #排序
+    get_sort(grade)
+    
+    #格式化输出成绩  
+    print("\n")
+    l=len(grade)
+    if l>0:    
+        print('学号：'+grade[0]+"   姓名："+grade[1])
+        print("\n")
+        print(grade[2])
+        print("\n")
+        a=grade[2]
+        i=0
+        while i<l:
+            if grade[i+2]==a:
+                print(grade[i+3]+": "+grade[i+4])
+            else:
+                print("\n")
+                print(grade[i+2])
+                print("\n")
+                print(grade[i+3]+": "+grade[i+4])
+                a=grade[i+2]
+            i+=10
+        print("\n")
+if __name__ == '__main__':
+    while True:
+        print("本部查询输入 1     潇湘查询输入 2     退出系统输入 3")
+        flag = input("")
+        if flag=='3':
+            break;
+        main(flag)
