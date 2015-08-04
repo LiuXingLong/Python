@@ -1,0 +1,152 @@
+import http.cookiejar
+import urllib.request
+import urllib.error
+import urllib.parse
+import re
+import json
+import random
+
+#检测网页打开是否错误
+def get_exception(req):    
+    try:
+        response=urllib.request.urlopen(req)
+    except urllib.error.URLError as e:
+        if hasattr(e,'reason'):
+            print('We failed to reach a server.')
+            print('Reason:',e.reason)
+        elif hasattr(e,'code'):
+            print('The server couldn\'t fulfill the request.')
+            print('Error code:',e.code)
+    else:
+         return response
+        
+#设置header模拟浏览器访问
+def set_header(flag,url1,url2,data=None):
+    if flag=='1':
+        req = urllib.request.Request(url1,data)
+        req.add_header('Referer','http://kdjw.hnust.cn/kdjw/')
+    else:
+        req = urllib.request.Request(url2,data)
+        req.add_header('Referer','http://xxjw.hnust.cn/xxjw/')
+    req.add_header('User-Agent','Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.3; WOW64; Trident/7.0)')
+    return req;
+
+#查找并插入数据到列表
+def find_set(html,grade):
+    #找学号和姓名
+    a=html.find('<td width="21%">')    
+    while a!=-1:
+        b=html.find('</td>',a)
+        if b!=-1:
+             grade.append(html[a+16:b])
+        else:
+            b=a
+        a=html.find('<td width="21%">',b)      
+    a=html.find('学年学期')
+    while a!=-1:       
+        b=html.find('</td>',a)      
+        if b!=-1:
+            grade.append(html[a:b])            
+            a=html.find('学年学期',b)            
+            c=html.find('<td>&nbsp;',b)           
+            while c!=-1:
+                d=html.find('</td>',c)                
+                if d!=-1:                    
+                    grade.append(html[c+10:d])                    
+                    e=html.find('<td>',d)
+                    if e!=-1:                       
+                        f=html.find('</td>',e)                       
+                        grade.append(html[e+4:f])
+                if a!=-1:
+                    c=html.find('<td>&nbsp;',f,a)
+                if a==-1:
+                    c=html.find('<td>&nbsp;',f)
+                    
+#输出成绩
+def printf(grade):
+    print('\n')
+    l=len(grade)
+    if l>0:    
+        print('学号：'+grade[1]+"   姓名："+grade[0])
+        i=2
+        while i<l:
+            if str(grade[i])[0:4]=="学年学期":
+                print('\n'+grade[i]+'\n')
+                i+=1
+            else:
+                print(grade[i]+": "+grade[i+1])
+                i+=2
+        print('\n')
+        
+def main(flag):
+    #使用代理
+    iplist =['107.182.17.149:7808','202.106.16.36:3128']
+    proxy_support = urllib.request.ProxyHandler({'http':random.choice(iplist)})
+    opener = urllib.request.build_opener(proxy_support)
+    opener.addheaders = ['User-Agent','Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.3; WOW64; Trident/7.0)']
+   #获取cookie信息
+    cj = http.cookiejar.CookieJar()
+    pro = urllib.request.HTTPCookieProcessor(cj)
+    opener = urllib.request.build_opener(pro)
+    urllib.request.install_opener(opener)
+
+    #获取验证码
+    image1='http://kdjw.hnust.cn/kdjw/verifycode.servlet'
+    image2='http://xxjw.hnust.cn/xxjw/verifycode.servlet'
+    req=set_header(flag,image1,image2)
+    response = get_exception(req)
+    
+    #保存验证码
+    imagedata = response.read()
+    fp = open('验证码.jpg','wb')
+    fp.write(imagedata)
+    fp.close()
+    
+    #Post请求数据
+    url1='http://kdjw.hnust.cn/kdjw/xscjcx_check.jsp'
+    url2='http://xxjw.hnust.cn/xxjw/xscjcx_check.jsp'
+    
+    name=input('姓名：')
+    ID=input('身份证：')
+    yanzhengma=input('验证码：')
+    data={
+        'xsxm':name,
+        'xssfzh':ID,
+        'yzm':yanzhengma
+        }
+    data=urllib.parse.urlencode(data).encode('utf-8')
+    req=set_header(flag,url1,url2,data)
+    response = get_exception(req)
+    html=response.read().decode('utf-8')
+    a=html[20:52]
+
+    #判断是否成功登入
+    if html[20:29]=='yzm_cuowu':
+        print('\n'+"验证码错误！"+'\n')
+        return
+    if html[20:29]=='yzm_guoqi':
+        print('\n'+"验证码过期！"+'\n')
+        return
+    if html[20:30]=='notQueryXs':
+        print('\n'+"未找到该用户信息！"+'\n')
+        return
+    
+    url1='http://kdjw.hnust.cn/kdjw/xscjcx.jsp?yzbh='+a
+    url2='http://xxjw.hnust.cn/xxjw/xscjcx.jsp?yzbh='+a
+    
+    req=set_header(flag,url1,url2)
+    response = get_exception(req)  
+    html=response.read().decode('utf-8')
+    grade=[]
+    #查找并插入数据到列表
+    find_set(html,grade)
+    #输出成绩
+    printf(grade)
+    
+if __name__ == '__main__':
+    while True:
+        print("本部查询输入 1     潇湘查询输入 2     退出系统输入 3")
+        flag = input("")
+        if flag=='3':
+            break;
+        main(flag)
