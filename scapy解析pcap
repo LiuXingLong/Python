@@ -1,0 +1,41 @@
+from scapy.all import *
+import os
+import re
+import shutil
+import time 
+
+filepath = '/root/pcap/1.pcap'
+packets = rdpcap(filepath)
+
+for p in packets:
+    for f in p.payload.payload.payload.fields_desc:
+        fvalue = p.payload.getfieldval(f.name)
+        reprval = f.i2repr(p.payload,fvalue) #转换成十进制字符串
+        if reprval.find('HTTP') != -1:
+            print('=' * 100)
+            print(p.show())
+    '''
+    print('###[ Ethernet ]###')
+    for f in p.fields_desc:
+        fvalue = p.getfieldval(f.name)
+        reprval = f.i2repr(p.payload,fvalue) #转换成十进制字符串
+        print(f.name,reprval)
+    
+    print('###[ IP ]###')
+    for f in p.payload.fields_desc:
+        fvalue = p.payload.getfieldval(f.name)
+        reprval = f.i2repr(p.payload,fvalue) #转换成十进制字符串
+        print(f.name,reprval)
+
+    print('###[ TCP ]###')
+    for f in p.payload.payload.fields_desc:
+        fvalue = p.payload.getfieldval(f.name)
+        reprval = f.i2repr(p.payload,fvalue) #转换成十进制字符串
+        print(f.name,reprval)
+
+    print('###[ Raw ]###')
+    for f in p.payload.payload.payload.fields_desc:
+        fvalue = p.payload.getfieldval(f.name)
+        reprval = f.i2repr(p.payload,fvalue) #转换成十进制字符串
+        print(f.name,reprval)
+    '''
