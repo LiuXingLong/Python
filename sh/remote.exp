@@ -1,0 +1,29 @@
+#!/usr/bin/expect
+
+set timeout 30
+set ip [lindex $argv 0]
+set passwd [lindex $argv 1]
+set address /mnt
+set file snake.sh
+
+puts $ip
+puts $passwd
+
+set flag 0
+for {set i 2} {$i < $argc } {incr i} {
+   set val [lindex $argv $i]
+   if { $val == "|" } {
+      set flag 0
+      incr i
+      set val [lindex $argv $i]
+   }
+   if { $flag == 0 } {
+      set procname $val
+   } else {
+      set port $val
+      #此处为调用脚本处理进程 
+      puts $procname
+      puts $port
+   }
+   incr flag
+}
